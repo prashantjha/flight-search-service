@@ -305,3 +305,76 @@ This service is designed to integrate seamlessly with the existing Flight Bookin
 3. **Real-time Updates**: WebSocket support for live availability updates
 4. **Geographic Search**: Location-based airport suggestions
 5. **Price Alerts**: Notification system for price changes
+
+## Data Population & Architecture Notes
+
+### Development vs Production Data Flow
+
+**⚠️ Important Note**: This service includes MySQL integration and admin APIs for data population **for testing and demonstration purposes only**. In a real-world production environment, the architecture would be different.
+
+### Current Implementation (For Testing)
+```
+MySQL → Admin API → Neo4j & Elasticsearch
+```
+
+This service currently:
+- Connects to MySQL database to read flight data
+- Provides Admin APIs (`/api/v1/admin/*`) to populate Neo4j and Elasticsearch
+- Uses MySQL as the source of truth for flight schedules and availability
+- Synchronizes data between MySQL → Neo4j and MySQL → Elasticsearch via admin endpoints
+
+### Production Architecture (Real-world)
+```
+Independent Data Pipeline Service → Neo4j & Elasticsearch
+Flight Search Service → Neo4j & Elasticsearch (Read-only)
+```
+
+In production, this service would:
+- **NOT** interact with MySQL directly
+- **NOT** include data population logic
+- **Only** read from Neo4j and Elasticsearch for search operations
+- Receive data updates through independent data pipeline services or event streaming
+
+### Admin APIs (Testing Only)
+
+The following endpoints are included for testing convenience:
+
+```
+POST /api/v1/admin/sync/elasticsearch  - Populate Elasticsearch from MySQL
+POST /api/v1/admin/sync/neo4j         - Populate Neo4j from MySQL  
+POST /api/v1/admin/sync/all           - Populate both Neo4j and Elasticsearch
+GET  /api/v1/admin/health             - Check admin service health
+```
+
+### Why This Approach?
+
+**For Testing & Demonstration:**
+- ✅ Makes the service self-contained and easily testable
+- ✅ Allows demonstration of multi-database search capabilities
+- ✅ Simplifies local development and CI/CD setup
+- ✅ Provides complete data flow visibility
+
+**In Production:**
+- 🏭 Data population would be handled by dedicated ETL services
+- 🏭 Event-driven architecture with message queues (Kafka, RabbitMQ)
+- 🏭 Separate microservices for data ingestion and transformation
+- 🏭 Search service would be purely read-only for optimal performance
+
+### Transitioning to Production
+
+To adapt this service for production:
+
+1. **Remove MySQL Dependencies**:
+   - Remove `spring-boot-starter-data-jpa` dependency
+   - Remove all JPA entities and repositories
+   - Remove admin controller and data sync services
+
+2. **Make it Read-Only**:
+   - Keep only search endpoints
+   - Remove all data population logic
+   - Focus purely on Neo4j and Elasticsearch queries
+
+3. **Add Event Listeners** (if needed):
+   - Listen to data update events from message queues
+   - Update local caches when data changes
+   - Handle real-time availability updates
